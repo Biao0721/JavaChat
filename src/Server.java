@@ -10,18 +10,27 @@ import java.io.PrintStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
 
 public class Server extends JFrame implements ActionListener, Runnable{
     public ArrayList<ChatThread> arrayList = new ArrayList<>();
+
+    public  Map<String, String> userInformation;
+    private SqlConnection sqlConnection = new SqlConnection();
 
     private JTextArea jTextArea = new JTextArea();
     private JList jList = new JList();
     private JScrollPane jScrollPane = new JScrollPane();
     private JTextField jTextField = new JTextField();
     private JPanel jPanel = new JPanel();
+    private JScrollPane textjScrollPane =new JScrollPane();
 
     public Server(){
-        this.setLayout(new BorderLayout(5, 5));
+        userInformation = sqlConnection.getUserInformation();
+
+        this.setLayout(new BorderLayout( ));
         this.add(jScrollPane, BorderLayout.WEST);
         this.add(jPanel, BorderLayout.CENTER);
         this.setSize(800, 600);
@@ -30,7 +39,7 @@ public class Server extends JFrame implements ActionListener, Runnable{
         this.setLocationRelativeTo(null);
 
         jPanel.setLayout(new BorderLayout());
-        jPanel.add(jTextArea, BorderLayout.CENTER);
+        jPanel.add(textjScrollPane, BorderLayout.CENTER);
         jPanel.add(jTextField, BorderLayout.SOUTH);
 
         jTextField.setFont(new Font("黑体", 1, 20));
@@ -40,6 +49,10 @@ public class Server extends JFrame implements ActionListener, Runnable{
 
         jScrollPane.setPreferredSize(new Dimension(200, 200));
         jScrollPane.setViewportView(jList);
+
+        textjScrollPane.setBounds(20,20,100,50);
+        textjScrollPane.setViewportView(jTextArea);
+
         jTextField.addActionListener(this);
 
         new Thread(this).start();
@@ -74,10 +87,11 @@ public class Server extends JFrame implements ActionListener, Runnable{
         @Override
         public void run() {
             while (true){
+
                 try {
                     String string = bufferedReader.readLine();
+                    System.out.println("Client: " + string);
 
-                    System.out.println(string);
                     if (string.startsWith("UserName#")) {
                         String[] tmp = string.split("#");
                         userName = tmp[1];
@@ -97,20 +111,45 @@ public class Server extends JFrame implements ActionListener, Runnable{
                         String[] tmp = string.split("#");
                         offlineUser(tmp[1]);
                         continue;
-                    } else{
+                    } else if (string.startsWith("Login")) {
+                        String[] tmp = string.split("#");
+                        boolean flg = false;
+
+                        Iterator keys = userInformation.keySet().iterator();
+                        while(keys.hasNext()){
+                            String key = (String)keys.next();
+
+                            if(tmp[1].equals(key) && tmp[2].equals(userInformation.get(tmp[1]))){
+                                flg = true;
+                            }
+                        }
+                        if (flg) {
+                            printStream.println("Login");
+                            System.out.println("Server: Login");
+                        } else {
+                            printStream.println("Error");
+                            System.out.println("Server: Error");
+                        }
+                        continue;
+                    } else if (string.startsWith("Registered")) {
+                        String[] tmp = string.split("#");
+                        userInformation.put(tmp[1], tmp[2]);
+                        if (sqlConnection.insertUser(tmp[1], tmp[2])) {
+                            printStream.println("Registered");
+                            System.out.println("Server: Registered");
+                        }
+                        jTextArea.append("|" + tmp[1] + "\t|" + tmp[2] + "\t|\n");
+                        continue;
+                    } else {
                         jTextArea.append(string.split("#")[0] + "(" + string.split("#")[1] + "): " + string.split("#")[2] + "\n");
                     }
                     for (int i = 0; i < arrayList.size(); i++) {
                         arrayList.get(i).printStream.println(string);
-                        System.out.println(arrayList.get(i).userName + string);
                     }
-
-//                    this.printStream.println(string);
-//                    System.out.println(this.userName + string);
+                    System.out.println("Server: " + string);
 
                 } catch (Exception e) {
                     break;
-//                    e.printStackTrace();
                 }
             }
         }
@@ -122,14 +161,20 @@ public class Server extends JFrame implements ActionListener, Runnable{
 
         if (jTextField.getText().startsWith("offline")) {
             offlineUser(jTextFieldString.split(" ")[1]);
+        } else if (jTextField.getText().equals("sql")) {
+            Iterator keys = userInformation.keySet().iterator();
+            while(keys.hasNext()){
+                String key = (String)keys.next();
+                jTextArea.append("----------------------------\n");
+                jTextArea.append("|" + key + "\t|" + userInformation.get(key) + "\t|\n");
+            }
+            jTextArea.append("----------------------------\n");
         } else {
             for (int i = 0; i < arrayList.size(); i++) {
                 arrayList.get(i).printStream.println("Group Chat#" + "Group Chat#" + jTextFieldString);
-                System.out.println(arrayList.get(i).userName + "(send)Group Chat#" + "Group Chat#" + jTextFieldString);
             }
             jTextArea.append("Group Chat: " + jTextFieldString + "\n");
         }
-
         jTextField.setText("");
     }
 
@@ -151,14 +196,9 @@ public class Server extends JFrame implements ActionListener, Runnable{
             names[j] = arrayList.get(j).userName;
         }
 
-        for (String s: names) {
-            System.out.println(s);
-        }
-
         jList.setListData(names);
 
         for (int k = 0; k < arrayList.size(); k++) {
-            System.out.println(arrayList.get(k) + string);
             arrayList.get(k).printStream.println(string);
         }
 
